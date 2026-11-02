@@ -1,0 +1,7 @@
+build*/
+*.wav
+*.mp3
+/demo/
+/dist/
+__pycache__/
+.vscode/
