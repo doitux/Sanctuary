@@ -195,6 +195,8 @@ struct Voice {
     int combMask = 0, combPos = 0;
     float combLpL = 0, combLpR = 0, combDelay = 100;
     Drift airMove;
+    uint32_t airPh = 0, airInc = 0;
+    std::array<float, 8> airN {};
     // shimmer
     std::array<float, kPartials> sC {}, sS {}, sRc {}, sRs {};   // quadrature oscillators (cos, sin, rotation)
     std::array<bool, kPartials> sOn {};
@@ -246,6 +248,7 @@ struct Engine::Impl {
     int shMask = 0, shW = 4800, shWrite = 0, shCount = 0;
     float shFb = 0.f;
     float noiseLpL = 0.f, noiseLpR = 0.f;
+    float airNoiseCoef = 0.005f, airNoiseGain = 1.f;  // 4-pole low-pass for the air noise skirt (~30 Hz), unit-power gain
     // output
     float dcL = 0, dcR = 0, dcInL = 0, dcInR = 0, dcCoef = 0.999f;
     double limited = 0, limitCount = 0;
@@ -316,6 +319,7 @@ struct Engine::Impl {
         v.combPos = 0; v.combLpL = v.combLpR = 0;
         v.combDelay = std::min((float)(sr / v.freq), (float)(v.combMask - 4));
         v.airMove.init(rng, 2.f, 6.f);
+        v.airPh = rng.next(); v.airInc = phaseInc(v.freq, sr); v.airN.fill(0.f);
         // shimmer partials: octave, octave+fifth, two octaves, two octaves+fifth
         static const float ratio[kPartials] = { 2.f, 3.f, 4.f, 6.f };
         static const float base[kPartials] = { 1.f, 0.55f, 0.5f, 0.28f };
@@ -447,7 +451,7 @@ struct Engine::Impl {
     bool onWarm = true, onAir = true, onShim = true, onFound = true, onShFb = true;
 
     void renderVoice(Voice& v, int n, float dt, float* wL, float* wR, float* aL, float* aR, float* sL, float* sR, float* fM,
-                     const float* nL, const float* nR)
+                     const float* /*nL*/, const float* /*nR*/)
     {
         // ---- envelope (start/end of chunk, linear in between)
         const float g0 = v.gainAt();
@@ -510,29 +514,26 @@ struct Engine::Impl {
             v.ph[0] = p0; v.ph[1] = p1; v.ph[2] = p2; v.ph[3] = p3; v.ph[4] = p4;
         }
 
-        // ---- air: noise through combs tuned to the note (feedback 0.88: clearly pitched, still breathy)
+        // ---- air: every harmonic of the note gets a soft, breathy noise skirt (±~40 Hz) and nothing
+        //      lies between the harmonics: a band-limited saw ring-modulated by slow noise, per side.
+        //      (A tuned comb always leaves broadband noise between its peaks - that was the hiss.)
         v.airMove.step(rng, dt, 2.f, 6.f);
         if (onAir) {
-            const float fb = 0.88f, inG = 0.47f;        // sqrt(1 - fb^2)
             const float mv = 1.f + 0.45f * motion * v.airMove.value;
-            const float D = v.combDelay;
-            float* bl = v.combL.data(); float* br = v.combR.data();
-            const int mask = v.combMask;
-            int w = v.combPos;
-            float lpl = v.combLpL, lpr = v.combLpR;
-            const int di = (int)D; const float df = D - (float)di;
-            for (int i = 0; i < n; ++i) {
-                const int r0 = (w - di) & mask, r1 = (w - di - 1) & mask;
-                const float yl = bl[r0] + df * (bl[r1] - bl[r0]);
-                const float yr = br[r0] + df * (br[r1] - br[r0]);
-                lpl += 0.45f * (yl - lpl); lpr += 0.45f * (yr - lpr);    // loop damping: a soft, round breath
-                const float ol = inG * nL[i] + fb * lpl, orr = inG * nR[i] + fb * lpr;
-                bl[w] = ol; br[w] = orr;
-                w = (w + 1) & mask;
-                const float g = env[i] * mv;
-                aL[i] += g * ol; aR[i] += g * orr;
+            const float* ts = &tab.saw[(size_t)v.level * (kTable + 1)];
+            uint32_t ph = v.airPh; const uint32_t inc = v.airInc;
+            float l1 = v.airN[0], l2 = v.airN[1], l3 = v.airN[2], l4 = v.airN[3];
+            float r1 = v.airN[4], r2 = v.airN[5], r3 = v.airN[6], r4 = v.airN[7];
+            const float c = airNoiseCoef;
+            for (int i = 0; i < n; ++i) {                     // 4 poles: the skirt ends steeply, silence between harmonics
+                l1 += c * (rng.bi() - l1); l2 += c * (l1 - l2); l3 += c * (l2 - l3); l4 += c * (l3 - l4);
+                r1 += c * (rng.bi() - r1); r2 += c * (r1 - r2); r3 += c * (r2 - r3); r4 += c * (r3 - r4);
+                const float s = lookup(ts, ph); ph += inc;
+                const float g = env[i] * mv * airNoiseGain;
+                aL[i] += g * l4 * s; aR[i] += g * r4 * s;
             }
-            v.combPos = w; v.combLpL = lpl; v.combLpR = lpr;
+            v.airPh = ph;
+            v.airN = { l1, l2, l3, l4, r1, r2, r3, r4 };
         }
 
         // ---- shimmer partials: each blooms and fades on its own slow cycle (amplitude only)
@@ -728,6 +729,15 @@ void Engine::prepare(double sampleRate, int)
     m.warmHpL.set(35.f, 0.707f, sr); m.warmHpR.copyCoeffs(m.warmHpL);
     m.airHpL.set(450.f, 0.6f, sr); m.airHpR.copyCoeffs(m.airHpL);
     m.sendHp.set(110.f, 0.707f, sr);
+    m.airNoiseCoef = 1.f - std::exp(-2.f * kPi * 30.f / (float)sr);
+    {   // measure the std of the filtered noise once, so the air level does not depend on the sample rate
+        Rng r(7); float a = 0, b = 0, cc = 0, d = 0; double acc = 0; const int N = 400000;
+        for (int i = 0; i < N; ++i) {
+            a += m.airNoiseCoef * (r.bi() - a); b += m.airNoiseCoef * (a - b); cc += m.airNoiseCoef * (b - cc); d += m.airNoiseCoef * (cc - d);
+            if (i > 20000) acc += (double)d * d;
+        }
+        m.airNoiseGain = 0.7f / (float)std::sqrt(acc / (N - 20000));
+    }
     m.shHp.set(300.f, 0.707f, sr); m.shLp1.set(3200.f, 0.5412f, sr); m.shLp2.set(3200.f, 1.3066f, sr);
     m.shPostLp.set(7000.f, 0.707f, sr);
     m.dcCoef = (float)std::exp(-2.0 * M_PI * 6.0 / sampleRate);

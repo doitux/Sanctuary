@@ -8,7 +8,7 @@ piano, or play warm, wide pads with the sustain pedal and swell them with the ex
 Every sound is computed in real time from band-limited oscillators, tuned noise and a large hall –
 the plugin is a few megabytes and loads instantly.
 
-> Status: **0.2.0** – softer, rounder top (tuned to sit under a piano), bell-like *Sparkle*; engine, plugin, 8 factory presets. Sister project of
+> Status: **0.2.1** – softer, rounder top (tuned to sit under a piano), hiss-free *Air*, bell-like *Sparkle*; engine, plugin, 8 factory presets. Sister project of
 > [OpenSection](https://github.com/doitux/OpenSection) (computed string section).
 
 ## Two modes
@@ -36,7 +36,7 @@ Each note (a *voice*) has four layers, each with its own level knob:
 | layer | what it is |
 |---|---|
 | **Warm** | five wavetable oscillators (triangle ↔ saw, *Shape*), detuned by up to 25 cents (*Detune*) and drifting slowly at random (*Motion*). The middle oscillator stays in tune and carries the fundamental; the four outer ones have a weakened fundamental and spread across the stereo field. Equal detuned oscillators beat like random phasors and make a pad swell and dip by itself (≈ 10 dB); with this "anchored ensemble" the level stays within ± 0.6 dB while the upper harmonics still chorus. A 24 dB/oct low-pass (*Brightness*, 300 Hz – 6 kHz) moves slowly with *Motion*. |
-| **Air** | white noise through two comb filters tuned to the note (left and right with independent noise): breath that sits exactly on the harmonics. The noise is darkened before the combs and the band is rounded off with a 24 dB/oct low-pass at 1–2.6 kHz: air without hiss. |
+| **Air** | a breathy noise skirt (± ~30 Hz) around every harmonic of the note and nothing in between: a band-limited saw ring-modulated by slow, 4-pole filtered noise, independent left and right. (A tuned comb always leaves broadband noise between its peaks – that was the hiss in 0.1/0.2.) Rounded off with a 24 dB/oct low-pass at 1–2.6 kHz. |
 | **Shimmer** | sine partials an octave, octave + fifth, two octaves and two octaves + fifth above each note. Each one blooms and fades on its own slow cycle (4–17 s). Only the amplitude moves – never the pitch – so nothing wobbles or chirps. Partials fade out between 1.2 and 3.6 kHz (glassy, never hissy). With *Sparkle* the partials also light up one by one like small bells – a quick 35 ms rise, a 0.5–2 s fade – at a rate that follows *Motion*. |
 | **Foundation** | an organ-like fundamental (harmonics 1–4) plus a sine an octave below for low notes (never below 30 Hz), centred, phase-locked to the Warm layer so the two add and never beat. |
 
@@ -94,7 +94,7 @@ as host programs.
 | **Warm Worship** | the all-rounder: warm, round ensemble, a breath of air, a few glassy lights, medium hall |
 | **Shimmer Heaven** | octaves and fifths bloom and light up like small bells above a soft bed, octave-up hall, very wide |
 | **Air & Light** | breath tuned to the chord, very little body, widest |
-| **Deep Drone** | dark, slow and grounded: organ fundamental and sub, little top |
+| **Deep Drone** | dark and grounded, but alive: organ fundamental and sub, breathing air, slow glassy lights |
 | **Felt Ambient** | soft triangle ensemble, intimate room, gentle air |
 | **Soft Strings Pad** | rounded ensemble with wide detune, like a quiet synth string section |
 | **Dark Prayer** | low and closed, long cathedral tail |
