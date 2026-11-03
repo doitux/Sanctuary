@@ -97,16 +97,18 @@ struct Tables {
     // ensemble members add texture while the centre oscillator anchors the fundamental, so the pad
     // does not swell and dip by itself (equal detuned oscillators beat like random phasors).
     std::vector<float> tri, saw, triSide, sawSide;
+    std::vector<float> airOdd, airOddQ, airEven, airEvenQ;   // air carriers: odd/even saw harmonics, sine and cosine phase
     std::vector<float> organ, sine; // kTable + 1
     double sr = 0;
 
-    static void additive(std::vector<float>& out, size_t at, const std::vector<float>& amp, Fft& fft)
+    static void additive(std::vector<float>& out, size_t at, const std::vector<float>& amp, Fft& fft, bool cosine = false)
     {
         std::vector<float> re(kTable, 0.f), im(kTable, 0.f);
         const int H = (int)amp.size() - 1;
         for (int n = 1; n <= H && n < kTable / 2; ++n) {
             const float sigma = n == 0 ? 1.f : std::sin(kPi * n / (H + 1)) / (kPi * n / (H + 1));   // Lanczos: no Gibbs ringing
-            im[n] = -0.5f * amp[n] * sigma; im[kTable - n] = 0.5f * amp[n] * sigma;
+            if (cosine) { re[n] = 0.5f * amp[n] * sigma; re[kTable - n] = 0.5f * amp[n] * sigma; }
+            else { im[n] = -0.5f * amp[n] * sigma; im[kTable - n] = 0.5f * amp[n] * sigma; }
         }
         fft.transform(re.data(), im.data(), true);
         for (int i = 0; i < kTable; ++i) out[at + i] = re[i];
@@ -120,6 +122,7 @@ struct Tables {
         Fft fft(kTable);
         const double cap = std::min(0.45 * sr, 15000.0);   // nothing above 15 kHz: warm, never fizzy
         tri.assign((size_t)kLevels * (kTable + 1), 0.f); saw = tri; triSide = tri; sawSide = tri;
+        airOdd = tri; airOddQ = tri; airEven = tri; airEvenQ = tri;
         for (int j = 0; j < kLevels; ++j) {
             const double fmax = 27.5 * std::pow(2.0, j);
             const int H = std::max(1, std::min(kTable / 2 - 1, (int)(cap / fmax)));
@@ -130,6 +133,12 @@ struct Tables {
             }
             additive(tri, (size_t)j * (kTable + 1), a, fft);
             additive(saw, (size_t)j * (kTable + 1), b, fft);
+            {   // air carriers: odd and even harmonics apart, each in sine and cosine phase
+                std::vector<float> o(H + 1, 0.f), e(H + 1, 0.f);
+                for (int n = 1; n <= H; ++n) ((n & 1) ? o : e)[n] = 1.f / (float)n;
+                additive(airOdd, (size_t)j * (kTable + 1), o, fft); additive(airOddQ, (size_t)j * (kTable + 1), o, fft, true);
+                additive(airEven, (size_t)j * (kTable + 1), e, fft); additive(airEvenQ, (size_t)j * (kTable + 1), e, fft, true);
+            }
             a[1] *= kSideH1; b[1] *= kSideH1;
             if (H >= 2) { a[2] *= kSideH2; b[2] *= kSideH2; }
             additive(triSide, (size_t)j * (kTable + 1), a, fft);
@@ -141,6 +150,11 @@ struct Tables {
             for (auto& x : t) x *= g;
             for (auto& x : side) x *= g;
         };
+        {   // the air carriers get the saw's gain (measured before the saw itself is scaled)
+            double e = 0; for (int i = 0; i < kTable; ++i) e += (double)saw[i] * saw[i];
+            const float g = (float)(0.5 / std::sqrt(e / kTable));
+            for (auto* t : { &airOdd, &airOddQ, &airEven, &airEvenQ }) for (auto& x : *t) x *= g;
+        }
         normalise(tri, triSide); normalise(saw, sawSide);
         organ.assign(kTable + 1, 0.f); sine.assign(kTable + 1, 0.f);
         additive(organ, 0, { 0.f, 1.f, 0.32f, 0.11f, 0.04f }, fft);
@@ -196,7 +210,7 @@ struct Voice {
     float combLpL = 0, combLpR = 0, combDelay = 100;
     Drift airMove;
     uint32_t airPh = 0, airInc = 0;
-    std::array<float, 8> airN {};
+    std::array<float, 32> airN {};                   // 8 slow noises (4 poles each)
     // shimmer
     std::array<float, kPartials> sC {}, sS {}, sRc {}, sRs {};   // quadrature oscillators (cos, sin, rotation)
     std::array<bool, kPartials> sOn {};
@@ -514,26 +528,36 @@ struct Engine::Impl {
             v.ph[0] = p0; v.ph[1] = p1; v.ph[2] = p2; v.ph[3] = p3; v.ph[4] = p4;
         }
 
-        // ---- air: every harmonic of the note gets a soft, breathy noise skirt (±~40 Hz) and nothing
-        //      lies between the harmonics: a band-limited saw ring-modulated by slow noise, per side.
-        //      (A tuned comb always leaves broadband noise between its peaks - that was the hiss.)
+        // ---- air: every harmonic of the note gets a soft, breathy noise skirt (±~30 Hz) and nothing
+        //      lies between the harmonics. Two slow noises drive each carrier in sine and cosine phase
+        //      (the envelope never drops to zero, the phase just wanders), and odd and even harmonics
+        //      have their own noises, so the breath never stops all at once.
+        //      (0.1/0.2: a tuned comb left hiss between its peaks; 0.2.1: one noise times a saw dipped
+        //      to zero together on all harmonics - choppy.)
         v.airMove.step(rng, dt, 2.f, 6.f);
         if (onAir) {
             const float mv = 1.f + 0.45f * motion * v.airMove.value;
-            const float* ts = &tab.saw[(size_t)v.level * (kTable + 1)];
+            const size_t o = (size_t)v.level * (kTable + 1);
+            const float* tO = &tab.airOdd[o]; const float* tOQ = &tab.airOddQ[o];
+            const float* tE = &tab.airEven[o]; const float* tEQ = &tab.airEvenQ[o];
             uint32_t ph = v.airPh; const uint32_t inc = v.airInc;
-            float l1 = v.airN[0], l2 = v.airN[1], l3 = v.airN[2], l4 = v.airN[3];
-            float r1 = v.airN[4], r2 = v.airN[5], r3 = v.airN[6], r4 = v.airN[7];
-            const float c = airNoiseCoef;
-            for (int i = 0; i < n; ++i) {                     // 4 poles: the skirt ends steeply, silence between harmonics
-                l1 += c * (rng.bi() - l1); l2 += c * (l1 - l2); l3 += c * (l2 - l3); l4 += c * (l3 - l4);
-                r1 += c * (rng.bi() - r1); r2 += c * (r1 - r2); r3 += c * (r2 - r3); r4 += c * (r3 - r4);
-                const float s = lookup(ts, ph); ph += inc;
-                const float g = env[i] * mv * airNoiseGain;
-                aL[i] += g * l4 * s; aR[i] += g * r4 * s;
+            const float c = airNoiseCoef, G = airNoiseGain * 0.7071f;
+            auto& z = v.airN;                                  // 8 noises x 4 poles
+            for (int i = 0; i < n; ++i) {
+                float nz[8];
+                for (int q = 0; q < 8; ++q) {
+                    float* st = &z[(size_t)q * 4];
+                    st[0] += c * (rng.bi() - st[0]); st[1] += c * (st[0] - st[1]);
+                    st[2] += c * (st[1] - st[2]); st[3] += c * (st[2] - st[3]);
+                    nz[q] = st[3];
+                }
+                const float so = lookup(tO, ph), soq = lookup(tOQ, ph), se = lookup(tE, ph), seq = lookup(tEQ, ph);
+                ph += inc;
+                const float g = env[i] * mv * G;
+                aL[i] += g * (nz[0] * so + nz[1] * soq + nz[2] * se + nz[3] * seq);
+                aR[i] += g * (nz[4] * so + nz[5] * soq + nz[6] * se + nz[7] * seq);
             }
             v.airPh = ph;
-            v.airN = { l1, l2, l3, l4, r1, r2, r3, r4 };
         }
 
         // ---- shimmer partials: each blooms and fades on its own slow cycle (amplitude only)
