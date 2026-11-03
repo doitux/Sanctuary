@@ -21,11 +21,12 @@ struct Params {
     float warm = 0.85f;             // detuned ensemble (band-limited triangle .. saw)
     float air = 0.25f;              // breath: noise through combs tuned to the notes
     float shimmer = 0.25f;          // additive octave / fifth partials that slowly bloom and fade
+    float sparkle = 0.3f;           // 0 .. 1  the shimmer partials light up like small bells, one by one
     float foundation = 0.5f;        // sine/organ fundamental + sub octave for low notes
     // tone
     float shape = 0.45f;            // 0 = triangle (soft) .. 1 = saw (rich)
     float detune = 0.4f;            // 0 .. 1 -> ensemble spread 0 .. 25 cents
-    float brightness = 0.42f;       // 0 .. 1 -> low-pass 350 Hz .. 9 kHz
+    float brightness = 0.42f;       // 0 .. 1 -> low-pass 300 Hz .. 6 kHz (rounded top: pads sit under a piano)
     float motion = 0.45f;           // 0 .. 1 depth of all slow modulation (drift, filter, partials)
     float width = 0.8f;             // 0 .. 1 stereo spread of the ensemble and air
     // play-mode envelope

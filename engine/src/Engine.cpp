@@ -200,6 +200,7 @@ struct Voice {
     std::array<bool, kPartials> sOn {};
     std::array<float, kPartials> sPan {}, sAmp {}, sBase {}, sGL {}, sGR {};
     std::array<Drift, kPartials> bloom;
+    std::array<float, kPartials> ping {}, pingPeak {}, pingTau {}, pingAtk {};   // sparkle: bell-like lights
     // foundation
     uint32_t fPh = 0, fInc = 0, subPh = 0, subInc = 0;
     float fW = 0, subW = 0;
@@ -236,7 +237,7 @@ struct Engine::Impl {
     Drift cutoffLfo, airLfo;
     // buses
     Svf warmLp1L, warmLp1R, warmLp2L, warmLp2R, warmHpL, warmHpR;
-    Svf airHpL, airHpR, airLpL, airLpR;
+    Svf airHpL, airHpR, airLpL, airLpR, airLp2L, airLp2R;
     Svf sendHp, shLp1, shLp2, shHp, shPostLp;
     Hall hall;
     float hallRt = -1;
@@ -244,6 +245,7 @@ struct Engine::Impl {
     std::vector<float> shBuf;
     int shMask = 0, shW = 4800, shWrite = 0, shCount = 0;
     float shFb = 0.f;
+    float noiseLpL = 0.f, noiseLpR = 0.f;
     // output
     float dcL = 0, dcR = 0, dcInL = 0, dcInR = 0, dcCoef = 0.999f;
     double limited = 0, limitCount = 0;
@@ -324,11 +326,12 @@ struct Engine::Impl {
             v.sRc[p] = (float)std::cos(w); v.sRs[p] = (float)std::sin(w);
             v.sC[p] = (float)std::cos(ph0); v.sS[p] = (float)std::sin(ph0);
             // fade the partials out between 3 and 9 kHz: shimmer without hiss or harshness
-            const float hf = f < 3000.f ? 1.f : f > 9000.f ? 0.f : 0.5f + 0.5f * std::cos(kPi * (f - 3000.f) / 6000.f);
+            const float hf = f < 1200.f ? 1.f : f > 3600.f ? 0.f : 0.5f + 0.5f * std::cos(kPi * (f - 1200.f) / 2400.f);   // glassy, never hissy
             v.sBase[p] = base[p] * hf;
             v.sPan[p] = rng.bi() * 0.9f; v.sGL[p] = v.sGR[p] = 0.70710678f;
             v.bloom[p].init(rng, 4.f, 11.f);
             v.sAmp[p] = 0;
+            v.ping[p] = 0.f; v.pingPeak[p] = 0.f; v.pingAtk[p] = 0.f; v.pingTau[p] = 1.f;
         }
         // foundation: fundamental fades out above C5, sub octave only for low notes (and never below 30 Hz)
         v.fInc = phaseInc(v.freq * centsToRatio(0.f), sr);
@@ -430,7 +433,7 @@ struct Engine::Impl {
     {
         const float a = first ? 1.f : 1.f - std::exp(-dt / 0.06f);
         auto sm = [a](float& c, float t) { c += a * (t - c); };
-        sm(cur.warm, target.warm); sm(cur.air, target.air); sm(cur.shimmer, target.shimmer); sm(cur.foundation, target.foundation);
+        sm(cur.warm, target.warm); sm(cur.air, target.air); sm(cur.shimmer, target.shimmer); sm(cur.sparkle, target.sparkle); sm(cur.foundation, target.foundation);
         sm(cur.shape, target.shape); sm(cur.detune, target.detune); sm(cur.brightness, target.brightness);
         sm(cur.motion, target.motion); sm(cur.width, target.width); sm(cur.size, target.size);
         sm(cur.reverbMix, target.reverbMix); sm(cur.shimmerVerb, target.shimmerVerb); sm(cur.gainDb, target.gainDb);
@@ -522,7 +525,7 @@ struct Engine::Impl {
                 const int r0 = (w - di) & mask, r1 = (w - di - 1) & mask;
                 const float yl = bl[r0] + df * (bl[r1] - bl[r0]);
                 const float yr = br[r0] + df * (br[r1] - br[r0]);
-                lpl += 0.6f * (yl - lpl); lpr += 0.6f * (yr - lpr);      // loop damping: higher harmonics breathier
+                lpl += 0.45f * (yl - lpl); lpr += 0.45f * (yr - lpr);    // loop damping: a soft, round breath
                 const float ol = inG * nL[i] + fb * lpl, orr = inG * nR[i] + fb * lpr;
                 bl[w] = ol; br[w] = orr;
                 w = (w + 1) & mask;
@@ -541,7 +544,21 @@ struct Engine::Impl {
                 v.bloom[p].step(rng, dt, 4.f + 6.f * (1.f - motion), 9.f + 8.f * (1.f - motion));
                 const float b = 0.5f + 0.5f * v.bloom[p].value;              // 0..1
                 const float bloom = (1.f - motion) * 0.6f + motion * (b * b * 1.6f);
-                const float a1 = v.sOn[p] ? v.sBase[p] * bloom * std::min(1.f, bright * (p == 0 ? 1.f : 0.8f)) : 0.f;
+                // sparkle: now and then a partial lights up quickly and fades like a small bell
+                const float sp = cur.sparkle;
+                if (sp > 0.f) {
+                    if (v.pingAtk[p] > 0.f) {
+                        v.ping[p] += (v.pingPeak[p] - v.ping[p]) * (1.f - std::exp(-dt / 0.012f));
+                        v.pingAtk[p] -= dt;
+                    } else v.ping[p] *= std::exp(-dt / v.pingTau[p]);
+                    const float rate = sp * (0.12f + 0.45f * motion);          // lights per second per partial
+                    if (rng.uni() < rate * dt) {
+                        v.pingPeak[p] = 0.6f + 0.6f * rng.uni(); v.pingAtk[p] = 0.035f;
+                        v.pingTau[p] = (0.5f + 1.5f * rng.uni()) * (p >= 2 ? 0.7f : 1.f);
+                    }
+                }
+                const float level = (1.f - 0.7f * sp) * bloom + sp * 2.2f * v.ping[p];
+                const float a1 = v.sOn[p] ? v.sBase[p] * level * std::min(1.f, bright * (p == 0 ? 1.f : 0.8f)) : 0.f;
                 const float a0 = v.sAmp[p]; v.sAmp[p] = a1;
                 al0[p] = a0 * v.sGL[p]; ar0[p] = a0 * v.sGR[p];
                 dl[p] = (a1 - a0) * v.sGL[p] / (float)n; dr[p] = (a1 - a0) * v.sGR[p] / (float)n;
@@ -597,7 +614,10 @@ struct Engine::Impl {
         }
         float wL[kCtl] = {}, wR[kCtl] = {}, aL[kCtl] = {}, aR[kCtl] = {}, sL[kCtl] = {}, sR[kCtl] = {}, fM[kCtl] = {};
         float nL[kCtl], nR[kCtl];
-        for (int i = 0; i < n; ++i) { nL[i] = rng.bi(); nR[i] = rng.bi(); }
+        for (int i = 0; i < n; ++i) {                          // darker noise: the breath has no hiss on top
+            noiseLpL += 0.3f * (rng.bi() - noiseLpL); noiseLpR += 0.3f * (rng.bi() - noiseLpR);
+            nL[i] = 2.2f * noiseLpL; nR[i] = 2.2f * noiseLpR;
+        }
 
         for (auto& v : voices)
             if (v.active) renderVoice(v, n, dt, wL, wR, aL, aR, sL, sR, fM, nL, nR);
@@ -606,11 +626,12 @@ struct Engine::Impl {
         cutoffLfo.step(rng, dt, 5.f, 11.f);
         airLfo.step(rng, dt, 3.f, 8.f);
         const float b = cur.brightness;
-        const float fc = 350.f * std::pow(9000.f / 350.f, b) * std::exp2(0.8f * cur.motion * cutoffLfo.value);
+        const float fc = std::min(7000.f, 300.f * std::pow(6000.f / 300.f, b) * std::exp2(0.8f * cur.motion * cutoffLfo.value));
         warmLp1L.set(fc, 0.5412f, (float)sr); warmLp2L.set(fc, 1.3066f, (float)sr);   // 4th-order Butterworth
         warmLp1R.copyCoeffs(warmLp1L); warmLp2R.copyCoeffs(warmLp2L);
-        const float fa = 2600.f * std::pow(4.f, b) * std::exp2(0.4f * cur.motion * airLfo.value);
-        airLpL.set(fa, 0.707f, (float)sr); airLpR.copyCoeffs(airLpL);
+        const float fa = 1000.f * std::pow(2.6f, b) * std::exp2(0.4f * cur.motion * airLfo.value);   // 1.0 .. 2.6 kHz, rounded
+        airLpL.set(fa, 0.5412f, (float)sr); airLpR.copyCoeffs(airLpL);
+        airLp2L.set(fa, 1.3066f, (float)sr); airLp2R.copyCoeffs(airLp2L);
 
         // ---- layer levels and global gains (linear ramps across the chunk)
         const float exprGain = expr * expr;                       // audio taper; pedal up = silent
@@ -632,7 +653,7 @@ struct Engine::Impl {
             float xl = warmHpL.hp(warmLp2L.lp(warmLp1L.lp(wL[i])));
             float xr = warmHpR.hp(warmLp2R.lp(warmLp1R.lp(wR[i])));
             // air: band 700 Hz .. brightness, width as mid/side
-            float al = airLpL.lp(airHpL.hp(aL[i])), ar = airLpR.lp(airHpR.hp(aR[i]));
+            float al = airLp2L.lp(airLpL.lp(airHpL.hp(aL[i]))), ar = airLp2R.lp(airLpR.lp(airHpR.hp(aR[i])));
             const float am = 0.5f * (al + ar), as = 0.5f * (al - ar) * width;
             al = am + as; ar = am - as;
             const float e = lerp(gExpr, exprGain, i);
@@ -705,7 +726,7 @@ void Engine::prepare(double sampleRate, int)
     for (int j = 0; j < kLevels; ++j) m.blendLevel(j, m.target.shape);
     const float sr = (float)sampleRate;
     m.warmHpL.set(35.f, 0.707f, sr); m.warmHpR.copyCoeffs(m.warmHpL);
-    m.airHpL.set(700.f, 0.6f, sr); m.airHpR.copyCoeffs(m.airHpL);
+    m.airHpL.set(450.f, 0.6f, sr); m.airHpR.copyCoeffs(m.airHpL);
     m.sendHp.set(110.f, 0.707f, sr);
     m.shHp.set(300.f, 0.707f, sr); m.shLp1.set(3200.f, 0.5412f, sr); m.shLp2.set(3200.f, 1.3066f, sr);
     m.shPostLp.set(7000.f, 0.707f, sr);
@@ -722,7 +743,7 @@ void Engine::reset()
     m.hall.clear();
     std::fill(m.shBuf.begin(), m.shBuf.end(), 0.f); m.shFb = 0;
     for (Svf* f : { &m.warmLp1L, &m.warmLp1R, &m.warmLp2L, &m.warmLp2R, &m.warmHpL, &m.warmHpR, &m.airHpL, &m.airHpR,
-                    &m.airLpL, &m.airLpR, &m.sendHp, &m.shLp1, &m.shLp2, &m.shHp, &m.shPostLp })
+                    &m.airLpL, &m.airLpR, &m.airLp2L, &m.airLp2R, &m.sendHp, &m.shLp1, &m.shLp2, &m.shHp, &m.shPostLp })
         f->clear();
     m.dcL = m.dcR = m.dcInL = m.dcInR = 0;
     m.gExpr = m.gWarm = m.gAir = m.gShim = m.gFound = m.gWet = m.gOut = m.gShFb = 0; m.gDry = 1;

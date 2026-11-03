@@ -91,7 +91,7 @@ static bool setParam(Params& p, const std::string& kv)
     const std::string k = kv.substr(0, eq);
     const float v = (float)std::atof(kv.c_str() + eq + 1);
     struct { const char* name; float* ptr; } map[] = {
-        { "crossfade", &p.crossfade }, { "warm", &p.warm }, { "air", &p.air }, { "shimmer", &p.shimmer },
+        { "crossfade", &p.crossfade }, { "warm", &p.warm }, { "air", &p.air }, { "shimmer", &p.shimmer }, { "sparkle", &p.sparkle },
         { "foundation", &p.foundation }, { "shape", &p.shape }, { "detune", &p.detune }, { "brightness", &p.brightness },
         { "motion", &p.motion }, { "width", &p.width }, { "attack", &p.attack }, { "release", &p.release },
         { "size", &p.size }, { "mix", &p.reverbMix }, { "shimmerverb", &p.shimmerVerb }, { "expression", &p.expression },

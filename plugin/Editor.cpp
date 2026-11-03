@@ -98,7 +98,7 @@ void SanctuaryEditor::setupCombo(Combo& c, const char* id, const char* text)
 SanctuaryEditor::SanctuaryEditor(SanctuaryProcessor& p) : AudioProcessorEditor(p), proc(p)
 {
     setLookAndFeel(&look);
-    row1.push_back({ "LAYERS", { &knob("warm", "Warm"), &knob("air", "Air"), &knob("shimmer", "Shimmer"), &knob("foundation", "Foundation") } });
+    row1.push_back({ "LAYERS", { &knob("warm", "Warm"), &knob("air", "Air"), &knob("shimmer", "Shimmer"), &knob("sparkle", "Sparkle"), &knob("foundation", "Foundation") } });
     row1.push_back({ "TONE", { &knob("shape", "Shape"), &knob("detune", "Detune"), &knob("brightness", "Brightness"),
                                &knob("motion", "Motion"), &knob("width", "Width") } });
     row2.push_back({ "ENVELOPE", { &knob("attack", "Attack"), &knob("release", "Release"), &knob("crossfade", "Crossfade") } });

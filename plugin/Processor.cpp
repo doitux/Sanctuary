@@ -12,6 +12,7 @@ static const char* crossfade = "crossfade";
 static const char* warm = "warm";
 static const char* air = "air";
 static const char* shimmer = "shimmer";
+static const char* sparkle = "sparkle";
 static const char* foundation = "foundation";
 static const char* shape = "shape";
 static const char* detune = "detune";
@@ -48,6 +49,7 @@ APVTS::ParameterLayout SanctuaryProcessor::layout()
     add(ids::warm, "Warm", 0.f, 1.f, d.warm);
     add(ids::air, "Air", 0.f, 1.f, d.air);
     add(ids::shimmer, "Shimmer", 0.f, 1.f, d.shimmer);
+    add(ids::sparkle, "Sparkle", 0.f, 1.f, d.sparkle);
     add(ids::foundation, "Foundation", 0.f, 1.f, d.foundation);
     add(ids::shape, "Shape", 0.f, 1.f, d.shape);
     add(ids::detune, "Detune", 0.f, 1.f, d.detune);
@@ -92,7 +94,7 @@ sanctuary::Params SanctuaryProcessor::readParams() const
     p.mode = (int)v(ids::mode) == 0 ? sanctuary::Mode::Drone : sanctuary::Mode::Play;
     p.colour = (sanctuary::Colour)jlimit(0, 2, (int)v(ids::colour));
     p.crossfade = v(ids::crossfade);
-    p.warm = v(ids::warm); p.air = v(ids::air); p.shimmer = v(ids::shimmer); p.foundation = v(ids::foundation);
+    p.warm = v(ids::warm); p.air = v(ids::air); p.shimmer = v(ids::shimmer); p.sparkle = v(ids::sparkle); p.foundation = v(ids::foundation);
     p.shape = v(ids::shape); p.detune = v(ids::detune); p.brightness = v(ids::brightness);
     p.motion = v(ids::motion); p.width = v(ids::width);
     p.attack = v(ids::attack); p.release = v(ids::release);
@@ -109,7 +111,7 @@ void SanctuaryProcessor::setCurrentProgram(int index)
     auto set = [this](const char* id, float value) {
         if (auto* prm = params.getParameter(id)) prm->setValueNotifyingHost(prm->convertTo0to1(value));
     };
-    set(ids::warm, pr.warm); set(ids::air, pr.air); set(ids::shimmer, pr.shimmer); set(ids::foundation, pr.foundation);
+    set(ids::warm, pr.warm); set(ids::air, pr.air); set(ids::shimmer, pr.shimmer); set(ids::sparkle, pr.sparkle); set(ids::foundation, pr.foundation);
     set(ids::shape, pr.shape); set(ids::detune, pr.detune); set(ids::brightness, pr.brightness);
     set(ids::motion, pr.motion); set(ids::width, pr.width); set(ids::attack, pr.attack); set(ids::release, pr.release);
     set(ids::size, pr.size); set(ids::mix, pr.reverbMix); set(ids::shimmerVerb, pr.shimmerVerb);
