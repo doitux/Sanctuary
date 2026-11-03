@@ -56,9 +56,9 @@ Measured with `sanctuary-render` and `tools/analyze/analyze.py` on a shared 2-co
 
 | check | result |
 |---|---|
-| CPU, drone D → G (crossfade) → off | ≈ 2 % of one core |
-| CPU, play mode, 6-note chords with sustain pedal | ≈ 3.3 % |
-| CPU, play mode stress (up to 18 overlapping voices) | ≈ 3.8 % |
+| CPU, drone D → G (crossfade) → off | 1.7–2 % of one core |
+| CPU, play mode, 6-note chords with sustain pedal | 2.7–3.3 % |
+| CPU, play mode stress (up to 18 overlapping voices) | 2.7–3.8 % |
 | CPU when silent | 0 (idle bypass once the tail has died away) |
 | peak level, drone / 6-note chords with pedal | −5.5 dBFS / −3.1 dBFS (all presets: ≤ −1.9 dBFS) |
 | DC offset | below −160 dBFS |
@@ -128,6 +128,8 @@ bash tools/demo/make-demos.sh                                          # one MP3
 `key time_s pitch-class` (a click on a drone key button). Options: `--mode drone|play`,
 `--preset name|index`, `--colour open|sus2|add9`, `--crossfade s`, `--set name=value` for any
 parameter, `--sr`, `--block`, `--seed`, `--tail`.
+
+`bash packaging/linux/package.sh` builds `dist/Sanctuary-<version>-linux-x86_64.zip` from a finished build.
 
 `sanctuary-claphost` (Linux, `--target sanctuary-claphost`) loads the built `.clap` like a host and
 renders a notes file through it.

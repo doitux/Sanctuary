@@ -15,17 +15,20 @@ from scipy import signal, linalg
 def read_wav(path):
     raw = open(path, "rb").read()
     assert raw[:4] == b"RIFF" and raw[8:12] == b"WAVE"
-    pos, fmt, data = 12, None, None
+    pos, fmt, data, fmtbody = 12, None, None, b""
     while pos < len(raw):
         cid, size = raw[pos:pos + 4], int.from_bytes(raw[pos + 4:pos + 8], "little")
         body = raw[pos + 8:pos + 8 + size]
         if cid == b"fmt ":
+            fmtbody = body
             fmt = (int.from_bytes(body[0:2], "little"), int.from_bytes(body[2:4], "little"),
                    int.from_bytes(body[4:8], "little"), int.from_bytes(body[14:16], "little"))
         elif cid == b"data":
             data = body
         pos += 8 + size + (size & 1)
     tag, ch, sr, bits = fmt
+    if tag == 0xFFFE:                       # WAVE_FORMAT_EXTENSIBLE (ffmpeg): real tag in the sub-format GUID
+        tag = int.from_bytes(fmtbody[24:26], "little")
     if tag == 3 and bits == 32:
         x = np.frombuffer(data, dtype="<f4")
     elif tag == 1 and bits == 16:
