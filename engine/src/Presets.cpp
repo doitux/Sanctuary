@@ -20,21 +20,21 @@ Params make(float warm, float air, float shimmer, float sparkle, float foundatio
 //                         warm  air   shim  spark found shape detun brigh motn  width att  rel   size mix   shVerb
 const Preset kPresets[] = {
     { "Warm Worship", "The all-rounder: warm, round ensemble, a breath of air, a few glassy lights, medium hall",
-      make(0.85f, 0.16f, 0.30f, 0.30f, 0.50f, 0.25f, 0.40f, 0.36f, 0.45f, 0.80f, 1.2f, 3.0f, 0.60f, 0.38f, 0.10f) },
+      make(0.85f, 0.11f, 0.30f, 0.30f, 0.50f, 0.25f, 0.40f, 0.36f, 0.45f, 0.80f, 1.2f, 3.0f, 0.60f, 0.38f, 0.10f) },
     { "Shimmer Heaven", "Octaves and fifths bloom and light up like small bells above a soft bed, octave-up hall",
-      make(0.50f, 0.22f, 0.90f, 0.60f, 0.35f, 0.15f, 0.35f, 0.45f, 0.65f, 1.00f, 2.0f, 5.0f, 0.85f, 0.55f, 0.45f) },
+      make(0.50f, 0.15f, 0.90f, 0.60f, 0.35f, 0.15f, 0.35f, 0.45f, 0.65f, 1.00f, 2.0f, 5.0f, 0.85f, 0.55f, 0.45f) },
     { "Air & Light", "Soft breath tuned to the chord, very little body, rounded on top",
-      make(0.40f, 0.75f, 0.45f, 0.35f, 0.25f, 0.10f, 0.30f, 0.38f, 0.55f, 1.00f, 1.5f, 4.0f, 0.70f, 0.50f, 0.18f) },
+      make(0.40f, 0.52f, 0.45f, 0.35f, 0.25f, 0.10f, 0.30f, 0.38f, 0.55f, 1.00f, 1.5f, 4.0f, 0.70f, 0.50f, 0.18f) },
     { "Deep Drone", "Dark and grounded, but alive: organ fundamental and sub, breathing air, slow glassy lights",
-      make(0.65f, 0.35f, 0.45f, 0.50f, 1.00f, 0.25f, 0.40f, 0.30f, 1.00f, 0.70f, 2.5f, 5.0f, 0.65f, 0.32f, 0.00f) },
+      make(0.65f, 0.24f, 0.45f, 0.50f, 1.00f, 0.25f, 0.40f, 0.30f, 1.00f, 0.70f, 2.5f, 5.0f, 0.65f, 0.32f, 0.00f) },
     { "Felt Ambient", "Soft triangle ensemble, intimate room, gentle air and slow glassy lights",
-      make(0.70f, 0.30f, 0.35f, 0.45f, 0.40f, 0.00f, 0.18f, 0.28f, 0.40f, 0.70f, 0.6f, 3.5f, 0.45f, 0.42f, 0.06f) },
+      make(0.70f, 0.21f, 0.35f, 0.45f, 0.40f, 0.00f, 0.18f, 0.28f, 0.40f, 0.70f, 0.6f, 3.5f, 0.45f, 0.42f, 0.06f) },
     { "Soft Strings Pad", "Rounded ensemble with wide detune, like a quiet synth string section",
-      make(1.00f, 0.15f, 0.15f, 0.10f, 0.30f, 0.55f, 0.62f, 0.55f, 0.50f, 0.90f, 0.9f, 2.0f, 0.50f, 0.32f, 0.00f) },
+      make(1.00f, 0.10f, 0.15f, 0.10f, 0.30f, 0.55f, 0.62f, 0.55f, 0.50f, 0.90f, 0.9f, 2.0f, 0.50f, 0.32f, 0.00f) },
     { "Dark Prayer", "Low and closed, long cathedral tail",
-      make(0.80f, 0.15f, 0.06f, 0.05f, 0.70f, 0.40f, 0.45f, 0.14f, 0.40f, 0.75f, 2.5f, 6.0f, 0.92f, 0.50f, 0.00f) },
+      make(0.80f, 0.10f, 0.06f, 0.05f, 0.70f, 0.40f, 0.45f, 0.14f, 0.40f, 0.75f, 2.5f, 6.0f, 0.92f, 0.50f, 0.00f) },
     { "Bright Morning", "Open and present, still round on top: lighter ensemble, airy, glittering lights",
-      make(0.75f, 0.38f, 0.55f, 0.55f, 0.30f, 0.40f, 0.50f, 0.58f, 0.55f, 0.90f, 0.8f, 2.5f, 0.55f, 0.40f, 0.22f) },
+      make(0.75f, 0.27f, 0.55f, 0.55f, 0.30f, 0.40f, 0.50f, 0.58f, 0.55f, 0.90f, 0.8f, 2.5f, 0.55f, 0.40f, 0.22f) },
 };
 constexpr int kNum = (int)(sizeof(kPresets) / sizeof(kPresets[0]));
 } // namespace

@@ -8,7 +8,7 @@ piano, or play warm, wide pads with the sustain pedal and swell them with the ex
 Every sound is computed in real time from band-limited oscillators, tuned noise and a large hall –
 the plugin is a few megabytes and loads instantly.
 
-> Status: **0.2.2** – softer, rounder top (tuned to sit under a piano), smooth, hiss-free *Air*, bell-like *Sparkle*; engine, plugin, 8 factory presets. Sister project of
+> Status: **0.2.3** – softer, rounder top (tuned to sit under a piano), calm, hiss-free *Air* (steady core with a slow breath), bell-like *Sparkle*; engine, plugin, 8 factory presets. Sister project of
 > [OpenSection](https://github.com/doitux/OpenSection) (computed string section).
 
 ## Two modes
@@ -36,7 +36,7 @@ Each note (a *voice*) has four layers, each with its own level knob:
 | layer | what it is |
 |---|---|
 | **Warm** | five wavetable oscillators (triangle ↔ saw, *Shape*), detuned by up to 25 cents (*Detune*) and drifting slowly at random (*Motion*). The middle oscillator stays in tune and carries the fundamental; the four outer ones have a weakened fundamental and spread across the stereo field. Equal detuned oscillators beat like random phasors and make a pad swell and dip by itself (≈ 10 dB); with this "anchored ensemble" the level stays within ± 0.6 dB while the upper harmonics still chorus. A 24 dB/oct low-pass (*Brightness*, 300 Hz – 6 kHz) moves slowly with *Motion*. |
-| **Air** | a breathy noise skirt (± ~30 Hz) around every harmonic of the note and nothing in between. Slow, 4-pole filtered noises drive band-limited carriers in sine *and* cosine phase, so a harmonic's envelope never drops to zero (its phase wanders instead), and odd and even harmonics breathe independently, so the air never stops all at once. Independent left and right, rounded off with a 24 dB/oct low-pass at 1–2.6 kHz. (0.1/0.2: a tuned comb left hiss between its peaks; 0.2.1: one noise times a saw made all harmonics drop out together – choppy.) |
+| **Air** | a calm breath around every harmonic of the note and nothing in between. 70 % of it is a steady core (band-limited odd and even harmonics, in sine phase on the left and cosine phase on the right – wide, yet mono-safe), 30 % is a slow noise skirt (about ± 6 Hz, up to ± 18 Hz with *Motion*) from 4-pole filtered noises in sine and cosine phase, odd and even harmonics breathing independently. Rounded off with a 24 dB/oct low-pass at 1–2.6 kHz. (0.1/0.2: a tuned comb left hiss between its peaks; 0.2.1: one noise times a saw – choppy; 0.2.2: smooth but every harmonic fluttered about 6 dB at ~20 Hz – restless.) |
 | **Shimmer** | sine partials an octave, octave + fifth, two octaves and two octaves + fifth above each note. Each one blooms and fades on its own slow cycle (4–17 s). Only the amplitude moves – never the pitch – so nothing wobbles or chirps. Partials fade out between 1.2 and 3.6 kHz (glassy, never hissy). With *Sparkle* the partials also light up one by one like small bells – a quick 35 ms rise, a 0.5–2 s fade – at a rate that follows *Motion*. |
 | **Foundation** | an organ-like fundamental (harmonics 1–4) plus a sine an octave below for low notes (never below 30 Hz), centred, phase-locked to the Warm layer so the two add and never beat. |
 

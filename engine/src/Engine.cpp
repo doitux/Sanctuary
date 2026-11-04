@@ -30,6 +30,7 @@ constexpr int kMaxVoices = 32;
 constexpr int kSoftVoiceLimit = 24; // above this, the quietest released voice is faded out quickly
 constexpr int kUnison = 5;
 constexpr int kPartials = 4;
+constexpr float kAirNoiseShare = 0.3f;   // part of the air power that is breath (the rest is a steady core)
 constexpr int kTableBits = 12;
 constexpr int kTable = 1 << kTableBits;
 constexpr int kLevels = 11;         // mip levels: level j holds fundamentals up to 27.5 Hz * 2^j
@@ -541,7 +542,12 @@ struct Engine::Impl {
             const float* tO = &tab.airOdd[o]; const float* tOQ = &tab.airOddQ[o];
             const float* tE = &tab.airEven[o]; const float* tEQ = &tab.airEvenQ[o];
             uint32_t ph = v.airPh; const uint32_t inc = v.airInc;
-            const float c = airNoiseCoef, G = airNoiseGain * 0.7071f;
+            // calm breath: a steady core carries most of the air (70 % of its power), the noise on top
+            // moves slowly - about 6 Hz bandwidth at Motion 0, 18 Hz at Motion 1 (0.2.2: 30 Hz, flutter)
+            const float bw = 6.f + 12.f * motion;
+            const float c = 1.f - std::exp(-2.f * kPi * bw / (float)sr);
+            const float G = airNoiseGain * std::sqrt(30.f / bw) * 0.7071f * std::sqrt(kAirNoiseShare);
+            const float S = 0.7f * std::sqrt(1.f - kAirNoiseShare);
             auto& z = v.airN;                                  // 8 noises x 4 poles
             for (int i = 0; i < n; ++i) {
                 float nz[8];
@@ -554,8 +560,11 @@ struct Engine::Impl {
                 const float so = lookup(tO, ph), soq = lookup(tOQ, ph), se = lookup(tE, ph), seq = lookup(tEQ, ph);
                 ph += inc;
                 const float g = env[i] * mv * G;
-                aL[i] += g * (nz[0] * so + nz[1] * soq + nz[2] * se + nz[3] * seq);
-                aR[i] += g * (nz[4] * so + nz[5] * soq + nz[6] * se + nz[7] * seq);
+                // the core sits in sine phase on the left and cosine phase on the right: as wide as the
+                // breath (no correlation), and nothing cancels when summed to mono
+                const float k = env[i] * mv * S;
+                aL[i] += g * (nz[0] * so + nz[1] * soq + nz[2] * se + nz[3] * seq) + k * (so + se);
+                aR[i] += g * (nz[4] * so + nz[5] * soq + nz[6] * se + nz[7] * seq) + k * (soq + seq);
             }
             v.airPh = ph;
         }
